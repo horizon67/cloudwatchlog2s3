@@ -55,8 +55,6 @@ $ docker run -p 8083:8083 --env-file aws-stepfunctions-local-credentials.txt ama
 ```
 ## Usage
 ```bash
-# ローカルでテストしたい場合、テスト用のs3バケットを別途作成しそちらにエクスポートするようにして下さい。template.yaml の ARCHIVE_S3_BUCKET_NAME を変更すればそちらに出力されます。変更後はsam buildとsamの再起動が必要です。
-
 # ステートマシンをローカル上に作成
 $ aws stepfunctions --endpoint http://localhost:8083 create-state-machine --name "Cloudwatchlog2s3StateMachine" --role-arn "arn:aws:iam::123456789012:role/DummyRole" --definition file://./statemachine/cloudwatchlog2s3_local.asl.json
 

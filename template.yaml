@@ -1,0 +1,181 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'cloudwatchlog2s3
+
+  SAM Template for cloudwatchlog2s3
+
+  '
+Resources:
+  DescribeLogGroupsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/describe-log-groups/
+      Handler: app.lambdaHandler
+      Runtime: nodejs14.x
+      Environment:
+        Variables:
+          # この保持期間を設定しているロググループを抽出
+          # 設定値: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653, 0
+          # `0` は保持期間無しのロググループを対象とする
+          RETENTION_IN_DAYS: 180
+          # ロググループ名のプレフィックス
+          LOG_GROUP_NAME_PREFIX: ''
+      Architectures:
+      - x86_64
+      MemorySize: 512
+      Timeout: 300
+      Role: !GetAtt DescribeLogGroupsFunctionRole.Arn
+  DescribeLogGroupsFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      - arn:aws:iam::aws:policy/AWSStepFunctionsReadOnlyAccess
+      - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+  ExportLogGroupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/export-log-group/
+      Handler: app.lambdaHandler
+      Runtime: nodejs14.x
+      Environment:
+        Variables:
+          ARCHIVE_S3_BUCKET_NAME: cloudwatch-log
+          # 何日前までのログをエクスポートするか
+          ARCHIVE_TARGET_DAYS_AGO: 10
+          # 何日分のログか。(`ARCHIVE_TARGET_DAYS_AGO` を起点とし前〜日分を設定。1日分のみなら`0`を指定、2日分は`1`)
+          ARCHIVE_TARGET_DATE_INTERVAL: 10
+          # 例えば、現在`2022/1/9` とした場合、
+          # ARCHIVE_TARGET_DAYS_AGO: 5, ARCHIVE_TARGET_DATE_INTERVAL: 2とすると、
+          # `2022/1/2 00:00:00` ~ `2022/1/4 23:59:59` のログを取得する
+          # ARCHIVE_TARGET_DAYS_AGO: 1, ARCHIVE_TARGET_DATE_INTERVAL: 0とすると、
+          # `2022/1/8 00:00:00` ~ `2022/1/8 23:59:59` のログを取得する
+      Architectures:
+      - x86_64
+      MemorySize: 512
+      Timeout: 600
+      Role: !GetAtt ExportLogGroupFunctionRole.Arn
+  ExportLogGroupFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      - arn:aws:iam::aws:policy/AWSStepFunctionsReadOnlyAccess
+      - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+      - arn:aws:iam::aws:policy/AmazonS3FullAccess
+  DescribeExportTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/describe-export-task/
+      Handler: app.lambdaHandler
+      Runtime: nodejs14.x
+      Architectures:
+      - x86_64
+      MemorySize: 512
+      Timeout: 300
+      Role: !GetAtt DescribeExportTaskFunctionRole.Arn
+  DescribeExportTaskFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      - arn:aws:iam::aws:policy/AWSStepFunctionsReadOnlyAccess
+      - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+  NotifyFailureFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/notify-failure/
+      Handler: app.lambdaHandler
+      Runtime: nodejs14.x
+      Environment:
+        Variables:
+          NOTIFY_SLACK_WEBHOOK_URL: Dummy
+      Architectures:
+      - x86_64
+      MemorySize: 512
+      Timeout: 300
+      Role: !GetAtt NotifyFailureFunctionRole.Arn
+  NotifyFailureFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      - arn:aws:iam::aws:policy/AWSStepFunctionsReadOnlyAccess
+  Cloudwatchlog2s3StateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: statemachine/cloudwatchlog2s3.asl.json
+      DefinitionSubstitutions:
+        DescribeLogGroupsFunction: !GetAtt DescribeLogGroupsFunction.Arn
+        ExportLogGroupFunction: !GetAtt ExportLogGroupFunction.Arn
+        DescribeExportTaskFunction: !GetAtt DescribeExportTaskFunction.Arn
+        NotifyFailureFunction: !GetAtt NotifyFailureFunction.Arn
+      Events:
+        ArchiveSchedule:
+          Type: Schedule
+          Properties:
+            Description: Schedule to run the Cloudwatchlog2s3 state machine every
+              day
+            Enabled: false
+            Schedule: cron(0 17 * * ? *)
+      Policies:
+      - LambdaInvokePolicy:
+          FunctionName:
+            Ref: DescribeLogGroupsFunction
+      - LambdaInvokePolicy:
+          FunctionName:
+            Ref: ExportLogGroupFunction
+      - LambdaInvokePolicy:
+          FunctionName:
+            Ref: DescribeExportTaskFunction
+      - LambdaInvokePolicy:
+          FunctionName:
+            Ref: NotifyFailureFunction
+Outputs:
+  Cloudwatchlog2s3StateMachineArn:
+    Description: Cloudwatchlog2s3 state machine ARN
+    Value: !Ref Cloudwatchlog2s3StateMachine
+  Cloudwatchlog2s3StateMachineRole:
+    Description: IAM Role created for Cloudwatchlog2s3 state machine based on the
+      specified SAM Policy Templates
+    Value: !GetAtt Cloudwatchlog2s3StateMachineRole.Arn

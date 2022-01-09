@@ -1,7 +1,7 @@
 # cloudwatchlog2s3
 
 Cloudwatch Logsを定期的にS3へ保存する。
-(Step Functions + Lambdaを使用しています)
+(Step Functions + Lambdaを使用)
 
 ## structure
 ### ディレクトリ構造
@@ -9,8 +9,6 @@ Cloudwatch Logsを定期的にS3へ保存する。
 ├── README.md
 ├── docs # ドキュメント格納用
 │   └── stepfunctions_graph.png # 処理フロー図
-├── event-samples # 個別にfunctionsを実行する時の為のイベントサンプル
-│   └── export-log-group-event.json
 ├── functions # lambda群
 │   ├── describe-export-task # エクスポートタスクを確認しステータスを返却する。
 │   │   ├── app.js

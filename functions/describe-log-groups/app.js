@@ -21,7 +21,10 @@ exports.lambdaHandler = async (event, context) => {
   try {
     let groups = [];
     let nextToken = null;
-    let params = {}
+    let params = {
+      logGroupNamePrefix: null,
+      nextToken: null
+    }
 
     if (logGroupNamePrefix) {
       params.logGroupNamePrefix = logGroupNamePrefix
@@ -40,12 +43,7 @@ exports.lambdaHandler = async (event, context) => {
     console.log("describeLogGroups success");
 
     // 保持期間でフィルタリング
-    const logGroups = groups.map(function(hash) {
-      if (hash.retentionInDays === retentionInDays) {
-        return hash.logGroupName;
-      }
-    }).filter(notUndefined => notUndefined !== undefined);
-
+    const logGroups = groups.filter((hash) => ( hash.retentionInDays === retentionInDays )).map((hash => (hash.logGroupName)))
     return {
       'logGroupsCount': logGroups.length,
       'logGroups': logGroups

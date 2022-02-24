@@ -15,16 +15,17 @@ const cloudwatchlogs = new aws.CloudWatchLogs();
  *
  */
 exports.lambdaHandler = async (event, context) => {
-  const taskId = event.iterator.taskId
+  const { taskId } = event.iterator
 
   try {
-    const params = { taskId: taskId }
+    const params = { taskId }
     const response = await cloudwatchlogs.describeExportTasks(params).promise();
     console.log("describeExportTasks success", params.taskId, response);
 
     const responseTask = response.exportTasks[0];
     const statusCode = responseTask.status.code;
-    console.log("Task ID:" + taskId);
+    // 文字列連携のときはこう書ける。
+    console.log(`Task ID: ${taskId}`); 
     console.log("Status code:" + statusCode);
     return { 'statusCode': statusCode }
   } catch (err) {

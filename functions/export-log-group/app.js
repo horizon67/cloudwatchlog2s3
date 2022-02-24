@@ -21,6 +21,8 @@ const s3BucketName = process.env.ARCHIVE_S3_BUCKET_NAME;
  *
  */
 exports.lambdaHandler = async (event, context) => {
+  // function(){} は基本的に使わない方が無難な気がしています。allow functionで。
+  // const getToTS = (daysAgo) => {}
   const getToTS = function(daysAgo) {
     // @see: https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_CreateExportTask.html
     return DateTime.local().setZone("Asia/Tokyo").minus({ days: daysAgo }).endOf('day').toMillis();
